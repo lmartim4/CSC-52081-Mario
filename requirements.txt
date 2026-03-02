@@ -1,0 +1,9 @@
+jupyter
+tqdm
+seaborn
+matplotlib
+gymnasium
+numpy
+torch
+pygame
+stable-baselines3
