@@ -1,0 +1,59 @@
+[project]
+name = "smb-rl-comparison"
+version = "0.1.0"
+description = "Comparative analysis of state representations in RL: pixels vs symbolic grid on Super Mario Bros"
+readme = "README.md"
+requires-python = ">=3.9,<3.12"
+license = {text = "MIT"}
+
+dependencies = [
+    # --- Core RL ---
+    "gym==0.25.1",
+    "gym-super-mario-bros==7.4.0",
+    "nes-py==8.2.1",
+    "stable-baselines3==2.7.1",
+
+    # --- Deep Learning (CPU — see [project.optional-dependencies] for CUDA) ---
+    "torch>=2.0.0",
+
+    # --- Scientific ---
+    "numpy==1.23.5",
+    "pandas>=2.0.0",
+
+    # --- Visualization ---
+    "matplotlib>=3.9.0",
+    "tensorboard>=2.10.0",
+
+    # --- Image processing ---
+    "opencv-python>=4.5.0",
+    "pillow>=10.0.0",
+
+    # --- Rendering ---
+    "pyglet==1.5.21",
+
+    # --- Utilities ---
+    "tqdm>=4.60.0",
+    "cloudpickle>=3.0.0",
+]
+
+[project.optional-dependencies]
+notebook = [
+    "jupyter>=1.0.0",
+    "ipywidgets>=7.0.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "black>=22.0.0",
+    "ruff>=0.1.0",
+    "seaborn>=0.12.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.backends"
+
+[tool.uv]
+# Pin numpy < 2 to avoid uint8 overflow in nes-py
+override-dependencies = [
+    "numpy==1.23.5",
+]
