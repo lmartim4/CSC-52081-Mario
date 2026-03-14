@@ -27,11 +27,17 @@ if _SUBMODULE_DIR not in sys.path:
 
 from smb_utils import smb_grid  # noqa: E402
 
-# Grid encoding values (same convention as smb_grid)
+# Grid encoding values (same convention as smb_grid, plus powerup)
 EMPTY = 0
 SOLID = 1
 ENEMY = -1
 MARIO = 2
+POWERUP = 3
+
+# Powerup RAM addresses
+_POWERUP_DRAWN = 0x0014
+_POWERUP_X_SCREEN = 0x008C
+_POWERUP_Y_SCREEN = 0x00D4
 
 # Visible grid dimensions (what the screen shows)
 VISIBLE_COLS = 16
@@ -55,7 +61,7 @@ class RAMGridObservation(gym.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
         self.observation_space = spaces.Box(
-            low=-1, high=2,
+            low=-1, high=3,
             shape=(VISIBLE_ROWS, VISIBLE_COLS),
             dtype=np.float32,
         )
@@ -63,7 +69,20 @@ class RAMGridObservation(gym.ObservationWrapper):
     def observation(self, obs):
         """Ignore the pixel obs; build grid from RAM via smb_grid."""
         grid = smb_grid(self.env).rendered_screen
+        self._fill_powerup(grid, self.unwrapped.ram)
         return grid.astype(np.float32)
+
+    @staticmethod
+    def _fill_powerup(grid, ram):
+        """Place a powerup (mushroom / flower / star) on the grid."""
+        if ram[_POWERUP_DRAWN] != 1:
+            return
+        px = int(ram[_POWERUP_X_SCREEN])
+        py = int(ram[_POWERUP_Y_SCREEN])
+        col = (px + 8) // 16
+        row = (py + 8 - 32) // 16
+        if 0 <= row < VISIBLE_ROWS and 0 <= col < VISIBLE_COLS:
+            grid[row, col] = POWERUP
 
 
 class FlattenGrid(gym.ObservationWrapper):
@@ -73,7 +92,7 @@ class FlattenGrid(gym.ObservationWrapper):
         super().__init__(env)
         flat_size = int(np.prod(self.observation_space.shape))
         self.observation_space = spaces.Box(
-            low=-1, high=2,
+            low=-1, high=3,
             shape=(flat_size,),
             dtype=np.float32,
         )
@@ -95,7 +114,7 @@ class FrameStackGrid(gym.Wrapper):
         self.n_skip = n_skip
         base_shape = env.observation_space.shape  # (13, 16)
         self.observation_space = spaces.Box(
-            low=-1, high=2,
+            low=-1, high=3,
             shape=(*base_shape, n_stack),
             dtype=np.float32,
         )
