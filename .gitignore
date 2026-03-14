@@ -14,3 +14,4 @@ results/*.png
 
 # OS
 .DS_Store
+uv.lock
