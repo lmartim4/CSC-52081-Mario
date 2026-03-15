@@ -1,0 +1,17 @@
+--- /tmp/tmp.lslsMJhInv/clean_env/lib/python3.11/site-packages/nes_py/_rom.py	2026-03-15 12:12:25.807691305 +0100
++++ .venv/lib/python3.11/site-packages/nes_py/_rom.py	2026-03-15 12:00:41.501908111 +0100
+@@ -57,12 +57,12 @@
+     @property
+     def prg_rom_size(self):
+         """Return the size of the PRG ROM in KB."""
+-        return 16 * self.header[4]
++        return 16 * int(self.header[4])
+ 
+     @property
+     def chr_rom_size(self):
+         """Return the size of the CHR ROM in KB."""
+-        return 8 * self.header[5]
++        return 8 * int(self.header[5])
+ 
+     @property
+     def flags_6(self):

@@ -11,21 +11,11 @@ References:
   - Tile grid: yumouwei/super-mario-bros-reinforcement-learning (smb_utils.py)
 """
 
-import os
-import sys
 import gym
 import numpy as np
 from gym import spaces
 
-# Make the external submodule importable
-_SUBMODULE_DIR = os.path.join(
-    os.path.dirname(__file__), os.pardir, os.pardir, "external", "yumouwei-smb"
-)
-_SUBMODULE_DIR = os.path.abspath(_SUBMODULE_DIR)
-if _SUBMODULE_DIR not in sys.path:
-    sys.path.insert(0, _SUBMODULE_DIR)
-
-from smb_utils import smb_grid  # noqa: E402
+from ..utils.smb_utils import smb_grid
 
 # Grid encoding values (same convention as smb_grid, plus powerup)
 EMPTY = 0
@@ -121,16 +111,22 @@ class FrameStackGrid(gym.Wrapper):
         self._frames = []
 
     def reset(self, **kwargs):
-        obs = self.env.reset(**kwargs)
+        result = self.env.reset(**kwargs)
+        obs, info = result if isinstance(result, tuple) else (result, {})
         self._frames = [obs] * (self.n_stack * self.n_skip)
-        return self._get_stacked()
+        return self._get_stacked(), info
 
     def step(self, action):
-        obs, reward, done, info = self.env.step(action)
+        result = self.env.step(action)
+        if len(result) == 5:
+            obs, reward, terminated, truncated, info = result
+        else:
+            obs, reward, terminated, info = result
+            truncated = False
         self._frames.append(obs)
         if len(self._frames) > self.n_stack * self.n_skip:
             self._frames.pop(0)
-        return self._get_stacked(), reward, done, info
+        return self._get_stacked(), reward, terminated, truncated, info
 
     def _get_stacked(self):
         # Pick every n_skip-th frame from the buffer
@@ -150,14 +146,25 @@ class SkipFrame(gym.Wrapper):
         super().__init__(env)
         self.skip = skip
 
+    def reset(self, **kwargs):
+        result = self.env.reset(**kwargs)
+        obs, info = result if isinstance(result, tuple) else (result, {})
+        return obs, info
+
     def step(self, action):
         total_reward = 0.0
+        terminated, truncated = False, False
         for _ in range(self.skip):
-            obs, reward, done, info = self.env.step(action)
+            result = self.env.step(action)
+            if len(result) == 5:
+                obs, reward, terminated, truncated, info = result
+            else:
+                obs, reward, terminated, info = result
+                truncated = False
             total_reward += reward
-            if done:
+            if terminated or truncated:
                 break
-        return obs, total_reward, done, info
+        return obs, total_reward, terminated, truncated, info
 
 
 # ---------------------------------------------------------------------------
@@ -165,7 +172,7 @@ class SkipFrame(gym.Wrapper):
 # ---------------------------------------------------------------------------
 
 def make_symbolic_env(
-    env_id="SuperMarioBros-1-1-v0",
+    env_id="SuperMarioBros-1-1-v3",
     skip=4,
     n_stack=4,
     n_skip=1,

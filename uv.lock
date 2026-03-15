@@ -3127,7 +3127,7 @@ requires-dist = [
     { name = "jupyter", marker = "extra == 'notebook'", specifier = ">=1.0.0" },
     { name = "matplotlib", specifier = ">=3.9.0" },
     { name = "nes-py", specifier = "==8.2.1" },
-    { name = "numpy", specifier = "==1.23.5" },
+    { name = "numpy", specifier = ">=1.23.5" },
     { name = "opencv-python", specifier = ">=4.5.0" },
     { name = "pandas", specifier = ">=2.0.0" },
     { name = "pillow", specifier = ">=10.0.0" },

@@ -23,7 +23,7 @@ def test_base_env(n_steps=200):
     print("TEST 1: Base environment (pixel observations)")
     print("=" * 60)
 
-    env = gym_super_mario_bros.make("SuperMarioBros-1-1-v0")
+    env = gym_super_mario_bros.make("SuperMarioBros-1-1-v3")
     env = JoypadSpace(env, SIMPLE_MOVEMENT)
 
     print(f"\nObservation space: {env.observation_space}")
@@ -44,7 +44,8 @@ def test_base_env(n_steps=200):
 
     for step in range(n_steps):
         action = env.action_space.sample()
-        obs, reward, done, info = env.step(action)
+        obs, reward, terminated, truncated, info = env.step(action)
+        done = terminated or truncated
         total_reward += reward
         max_x = max(max_x, info.get("x_pos", 0))
         if done:
