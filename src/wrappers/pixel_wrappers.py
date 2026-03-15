@@ -21,6 +21,22 @@ class GrayScaleObservation(gym.ObservationWrapper):
             low=0, high=255, shape=(h, w, 1), dtype=np.uint8
         )
 
+    def reset(self, **kwargs):
+        kwargs.pop('seed', None)
+        kwargs.pop('options', None)
+        result = self.env.reset(**kwargs)
+        obs, info = result if isinstance(result, tuple) else (result, {})
+        return self.observation(obs), info
+
+    def step(self, action):
+        result = self.env.step(action)
+        if len(result) == 5:
+            obs, reward, done, truncated, info = result
+        else:
+            obs, reward, done, info = result
+            truncated = False
+        return self.observation(obs), reward, done, truncated, info
+
     def observation(self, obs):
         gray = np.mean(obs, axis=2, keepdims=True).astype(np.uint8)
         return gray
@@ -36,6 +52,22 @@ class ResizeObservation(gym.ObservationWrapper):
         self.observation_space = spaces.Box(
             low=0, high=255, shape=(shape[0], shape[1], channels), dtype=np.uint8
         )
+
+    def reset(self, **kwargs):
+        kwargs.pop('seed', None)
+        kwargs.pop('options', None)
+        result = self.env.reset(**kwargs)
+        obs, info = result if isinstance(result, tuple) else (result, {})
+        return self.observation(obs), info
+
+    def step(self, action):
+        result = self.env.step(action)
+        if len(result) == 5:
+            obs, reward, done, truncated, info = result
+        else:
+            obs, reward, done, info = result
+            truncated = False
+        return self.observation(obs), reward, done, truncated, info
 
     def observation(self, obs):
         import cv2
@@ -118,6 +150,22 @@ class NormalizeObservation(gym.ObservationWrapper):
             shape=self.observation_space.shape,
             dtype=np.float32,
         )
+
+    def reset(self, **kwargs):
+        kwargs.pop('seed', None)
+        kwargs.pop('options', None)
+        result = self.env.reset(**kwargs)
+        obs, info = result if isinstance(result, tuple) else (result, {})
+        return self.observation(obs), info
+
+    def step(self, action):
+        result = self.env.step(action)
+        if len(result) == 5:
+            obs, reward, done, truncated, info = result
+        else:
+            obs, reward, done, info = result
+            truncated = False
+        return self.observation(obs), reward, done, truncated, info
 
     def observation(self, obs):
         return np.array(obs, dtype=np.float32) / 255.0
