@@ -1,6 +1,6 @@
 --- a/gym/wrappers/time_limit.py
 +++ b/gym/wrappers/time_limit.py
-@@ -47,7 +47,11 @@ class TimeLimit(gym.Wrapper):
+@@ -47,5 +47,10 @@
 
          """
 -        observation, reward, terminated, truncated, info = self.env.step(action)
@@ -11,3 +11,4 @@
 +        else:
 +            observation, reward, terminated, truncated, info = _result
          self._elapsed_steps += 1
+
