@@ -11,21 +11,11 @@ References:
   - Tile grid: yumouwei/super-mario-bros-reinforcement-learning (smb_utils.py)
 """
 
-import os
-import sys
 import gym
 import numpy as np
 from gym import spaces
 
-# Make the external submodule importable
-_SUBMODULE_DIR = os.path.join(
-    os.path.dirname(__file__), os.pardir, os.pardir, "external", "yumouwei-smb"
-)
-_SUBMODULE_DIR = os.path.abspath(_SUBMODULE_DIR)
-if _SUBMODULE_DIR not in sys.path:
-    sys.path.insert(0, _SUBMODULE_DIR)
-
-from smb_utils import smb_grid  # noqa: E402
+from ..utils.smb_utils import smb_grid
 
 # Grid encoding values (same convention as smb_grid, plus powerup)
 EMPTY = 0
@@ -165,7 +155,7 @@ class SkipFrame(gym.Wrapper):
 # ---------------------------------------------------------------------------
 
 def make_symbolic_env(
-    env_id="SuperMarioBros-1-1-v0",
+    env_id="SuperMarioBros-1-1-v3",
     skip=4,
     n_stack=4,
     n_skip=1,
