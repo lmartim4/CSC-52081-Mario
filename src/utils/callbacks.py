@@ -68,3 +68,77 @@ class CheckpointAndLogCallback(BaseCallback):
             self.logger.record("rollout/flag_rate_100", np.mean(last_100_f))
 
         return True
+
+
+class CurriculumCallback(BaseCallback):
+    """Linearly increase random_start_steps as training progresses."""
+
+    def __init__(self, start_steps=0, end_steps=100, total_timesteps=4_000_000):
+        super().__init__()
+        self.start_steps = start_steps
+        self.end_steps = end_steps
+        self.total_timesteps = total_timesteps
+
+    def _on_step(self) -> bool:
+        if self.n_calls % 1000 == 0:
+            fraction = min(self.n_calls / self.total_timesteps, 1.0)
+            current = int(self.start_steps + fraction * (self.end_steps - self.start_steps))
+            self.training_env.env_method('set_max_start_steps', current)
+        return True
+
+
+class PerLevelEvalCallback(BaseCallback):
+    """Periodically evaluate the model on each level and log separately."""
+
+    def __init__(self, levels, eval_freq=100_000, n_eval_episodes=5, skip=4, n_stack=4):
+        super().__init__()
+        self.levels = levels
+        self.eval_freq = eval_freq
+        self.n_eval_episodes = n_eval_episodes
+        self.skip = skip
+        self.n_stack = n_stack
+
+    def _on_step(self) -> bool:
+        if self.n_calls % self.eval_freq != 0:
+            return True
+
+        from src.wrappers import make_symbolic_env
+
+        for level in self.levels:
+            env = make_symbolic_env(
+                env_id=level, skip=self.skip, n_stack=self.n_stack,
+                flatten=True, random_start_steps=0,
+            )
+            rewards, flags, x_positions = [], [], []
+
+            for _ in range(self.n_eval_episodes):
+                result = env.reset()
+                obs = result[0] if isinstance(result, tuple) else result
+                done, total_reward, flag, max_x = False, 0.0, False, 0
+
+                while not done:
+                    action, _ = self.model.predict(obs, deterministic=True)
+                    result = env.step(int(action))
+                    if len(result) == 5:
+                        obs, reward, terminated, truncated, info = result
+                        done = terminated or truncated
+                    else:
+                        obs, reward, done, info = result
+                    total_reward += float(reward)
+                    max_x = max(max_x, info.get('x_pos', 0))
+                    if info.get('flag_get', False):
+                        flag = True
+
+                rewards.append(total_reward)
+                flags.append(flag)
+                x_positions.append(max_x)
+
+            env.close()
+
+            tag = level.split('-')[1] + '-' + level.split('-')[2]
+            self.logger.record(f'eval/{tag}_mean_reward', np.mean(rewards))
+            self.logger.record(f'eval/{tag}_flag_rate',   np.mean(flags))
+            self.logger.record(f'eval/{tag}_mean_x_pos',  np.mean(x_positions))
+
+        self.logger.dump(self.num_timesteps)
+        return True

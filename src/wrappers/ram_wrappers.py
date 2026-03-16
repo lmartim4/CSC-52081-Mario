@@ -17,6 +17,7 @@ References:
 
 import gym
 import numpy as np
+from collections import deque
 from gym import spaces
 
 from ..utils.smb_utils import smb_grid
@@ -55,24 +56,24 @@ class CustomRewardRAM(gym.Wrapper):
     def step(self, action):
         result = self.env.step(action)
         if len(result) == 5:
-            obs, reward, done, truncated, info = result
+            obs, reward, terminated, truncated, info = result
         else:
-            obs, reward, done, info = result
+            obs, reward, terminated, info = result
             truncated = False
 
         # Score-based reward
         reward += (info["score"] - self.curr_score) / 40.0
         self.curr_score = info["score"]
 
-        # Flag / death bonus
-        if done:
+        # Flag / death / timeout bonus
+        if terminated or truncated:
             if info.get("flag_get", False):
                 reward += 50
             else:
                 reward -= 50
 
         self.current_x = info.get("x_pos", self.current_x)
-        return obs, reward / 10.0, done, truncated, info
+        return obs, reward / 10.0, terminated, truncated, info
 
     def reset(self, **kwargs):
         kwargs.pop('seed', None)
@@ -105,10 +106,12 @@ class RAMGridObservation(gym.ObservationWrapper):
             shape=(VISIBLE_ROWS, VISIBLE_COLS),
             dtype=np.float32,
         )
+        self._grid = smb_grid(env)  # created once; re-initialised each step
 
     def observation(self, obs):
         """Ignore the pixel obs; build grid from RAM via smb_grid."""
-        grid = smb_grid(self.env).rendered_screen
+        self._grid.__init__(self.env)
+        grid = self._grid.rendered_screen.copy()
         self._fill_powerup(grid, self.unwrapped.ram)
         return grid.astype(np.float32)
 
@@ -126,19 +129,27 @@ class RAMGridObservation(gym.ObservationWrapper):
 
 
 class FlattenGrid(gym.ObservationWrapper):
-    """Flatten the 2-D grid into a 1-D vector for MLP policies."""
+    """Flatten the 2-D grid into a 1-D vector for MLP policies.
+
+    Appends Mario's normalised power state (RAM 0x0756 / 2) as an extra
+    element, growing the observation from (832,) to (833,).
+    """
+
+    # RAM address for Mario's power state: 0=small, 1=super, 2=fire
+    _POWER_STATE_ADDR = 0x0756
 
     def __init__(self, env):
         super().__init__(env)
-        flat_size = int(np.prod(self.observation_space.shape))
-        self.observation_space = spaces.Box(
-            low=-1, high=3,
-            shape=(flat_size,),
-            dtype=np.float32,
-        )
+        flat_size = int(np.prod(self.observation_space.shape)) + 1
+        low = np.full((flat_size,), -1, dtype=np.float32)
+        high = np.full((flat_size,), 3, dtype=np.float32)
+        low[-1] = 0.0
+        high[-1] = 1.0
+        self.observation_space = spaces.Box(low=low, high=high, dtype=np.float32)
 
     def observation(self, obs):
-        return obs.flatten()
+        power = self.unwrapped.ram[self._POWER_STATE_ADDR] / 2.0
+        return np.append(obs.flatten(), np.float32(power))
 
 
 class FrameStackGrid(gym.Wrapper):
@@ -158,14 +169,15 @@ class FrameStackGrid(gym.Wrapper):
             shape=(*base_shape, n_stack),
             dtype=np.float32,
         )
-        self._frames = []
+        buf_size = self.n_stack * self.n_skip
+        self._frames = deque(maxlen=buf_size)
 
     def reset(self, **kwargs):
         kwargs.pop('seed', None)
         kwargs.pop('options', None)
         result = self.env.reset(**kwargs)
         obs, info = result if isinstance(result, tuple) else (result, {})
-        self._frames = [obs] * (self.n_stack * self.n_skip)
+        self._frames.extend([obs] * self._frames.maxlen)
         return self._get_stacked(), info
 
     def step(self, action):
@@ -176,8 +188,6 @@ class FrameStackGrid(gym.Wrapper):
             obs, reward, terminated, info = result
             truncated = False
         self._frames.append(obs)
-        if len(self._frames) > self.n_stack * self.n_skip:
-            self._frames.pop(0)
         return self._get_stacked(), reward, terminated, truncated, info
 
     def _get_stacked(self):
@@ -189,6 +199,65 @@ class FrameStackGrid(gym.Wrapper):
         indices = sorted(indices)
         selected = [self._frames[max(0, i)] for i in indices]
         return np.stack(selected, axis=-1).astype(np.float32)
+
+
+class RandomStartWrapper(gym.Wrapper):
+    """Advance Mario by a random number of steps at the start of each episode.
+
+    Samples n_steps ~ Uniform[0, max_start_steps] and steps the env with
+    forward-biased random actions (right / right+A / right+B / right+A+B)
+    before returning the starting observation.  If Mario dies during warmup,
+    a fresh reset state is returned instead.
+
+    Placing this after the full observation pipeline (SkipFrame, RAMGrid,
+    FrameStack, Flatten) means the returned obs is always in the expected
+    format.
+
+    This prevents the agent from memorising the fixed level opening and
+    forces it to learn reusable features (jumping, enemy avoidance) that
+    generalise to any position.
+    """
+
+    # SIMPLE_MOVEMENT indices that move Mario rightward.
+    # Excludes NOOP (0), stationary jump (5), and left (6) so warmup
+    # actually advances Mario into the level.
+    _FORWARD_ACTIONS = [1, 2, 3, 4]  # right, right+A, right+B, right+A+B
+
+    def __init__(self, env, max_start_steps: int = 100):
+        super().__init__(env)
+        self.max_start_steps = max_start_steps
+
+    def reset(self, **kwargs):
+        kwargs.pop('seed', None)
+        kwargs.pop('options', None)
+        result = self.env.reset(**kwargs)
+        obs, info = result if isinstance(result, tuple) else (result, {})
+
+        if self.max_start_steps <= 0:
+            return obs, info
+
+        n_steps = np.random.randint(0, self.max_start_steps + 1)
+        for _ in range(n_steps):
+            action = int(np.random.choice(self._FORWARD_ACTIONS))
+            result = self.env.step(action)
+            if len(result) == 5:
+                obs, _, terminated, truncated, info = result
+                done = terminated or truncated
+            else:
+                obs, _, done, info = result
+            if done:
+                # Mario died during warmup — return a clean reset
+                result = self.env.reset(**kwargs)
+                obs, info = result if isinstance(result, tuple) else (result, {})
+                break
+
+        return obs, info
+
+    def set_max_start_steps(self, value: int):
+        self.max_start_steps = int(value)
+
+    def step(self, action):
+        return self.env.step(action)
 
 
 class SkipFrame(gym.Wrapper):
@@ -232,11 +301,17 @@ def make_symbolic_env(
     n_skip=1,
     flatten=False,
     monitor=False,
+    random_start_steps=0,
 ):
     """Create a symbolic-observation Super Mario Bros environment.
 
     Pipeline: JoypadSpace -> CustomRewardRAM -> SkipFrame -> RAMGridObservation
-              -> FrameStackGrid -> FlattenGrid -> Monitor
+              -> FrameStackGrid -> FlattenGrid -> RandomStartWrapper -> Monitor
+
+    Args:
+        random_start_steps: If > 0, a RandomStartWrapper is added that
+            advances Mario by Uniform[0, random_start_steps] steps at the
+            start of each episode, producing diverse starting positions.
     """
     import gym_super_mario_bros
     from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
@@ -254,6 +329,9 @@ def make_symbolic_env(
     if flatten:
         env = FlattenGrid(env)
 
+    if random_start_steps > 0:
+        env = RandomStartWrapper(env, max_start_steps=random_start_steps)
+
     if monitor:
         from stable_baselines3.common.monitor import Monitor
         env = Monitor(env)
@@ -268,20 +346,22 @@ def make_symbolic_vec_env(
     n_skip=1,
     flatten=False,
     num_envs=8,
+    random_start_steps=0,
 ):
     """Create parallel symbolic-observation environments using SubprocVecEnv."""
     from stable_baselines3.common.vec_env import SubprocVecEnv
 
-    def _make_env(env_id, skip, n_stack, n_skip, flatten):
+    def _make_env(env_id, skip, n_stack, n_skip, flatten, random_start_steps):
         def _init():
             return make_symbolic_env(
                 env_id=env_id, skip=skip,
                 n_stack=n_stack, n_skip=n_skip, flatten=flatten,
+                random_start_steps=random_start_steps,
             )
         return _init
 
     return SubprocVecEnv([
-        _make_env(env_id, skip, n_stack, n_skip, flatten)
+        _make_env(env_id, skip, n_stack, n_skip, flatten, random_start_steps)
         for _ in range(num_envs)
     ])
 
@@ -293,12 +373,15 @@ def make_symbolic_multitask_vec_env(
     n_skip=1,
     flatten=False,
     envs_per_level=4,
+    random_start_steps=0,
 ):
     """Create parallel envs across multiple levels for multi-task training.
 
     Args:
         envs_per_level: int or list of ints. If int, same count for all levels.
             If list, specifies count per level (must match len(env_ids)).
+        random_start_steps: If > 0, each env uses RandomStartWrapper to spawn
+            Mario at a random position up to this many steps into the level.
     """
     from stable_baselines3.common.vec_env import SubprocVecEnv
 
@@ -307,17 +390,18 @@ def make_symbolic_multitask_vec_env(
     else:
         counts = list(envs_per_level)
 
-    def _make_env(env_id, skip, n_stack, n_skip, flatten):
+    def _make_env(env_id, skip, n_stack, n_skip, flatten, random_start_steps):
         def _init():
             return make_symbolic_env(
                 env_id=env_id, skip=skip,
                 n_stack=n_stack, n_skip=n_skip, flatten=flatten,
+                random_start_steps=random_start_steps,
             )
         return _init
 
     env_fns = []
     for eid, count in zip(env_ids, counts):
         for _ in range(count):
-            env_fns.append(_make_env(eid, skip, n_stack, n_skip, flatten))
+            env_fns.append(_make_env(eid, skip, n_stack, n_skip, flatten, random_start_steps))
 
     return SubprocVecEnv(env_fns)
