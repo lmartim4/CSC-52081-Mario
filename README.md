@@ -65,6 +65,15 @@ patch -p0 $SITE/gym_super_mario_bros/smb_env.py  < patches/smb_env_numpy2.patch
 patch -p1 $SITE/gym/wrappers/time_limit.py       < patches/gym_time_limit_compat.patch
 ```
 
+```fish
+set SITE (python -c "import site; print(site.getsitepackages()[0])")
+patch -p0 $SITE/nes_py/_rom.py                   < patches/nes_py_numpy2.patch
+patch -p0 $SITE/gym/utils/passive_env_checker.py < patches/gym_bool8_numpy2.patch
+patch -p0 $SITE/gym_super_mario_bros/smb_env.py  < patches/smb_env_numpy2.patch
+patch -p1 $SITE/gym/wrappers/time_limit.py       < patches/gym_time_limit_compat.patch
+```
+
+
 ## Usage
 
 ### Training notebooks
