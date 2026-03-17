@@ -31,7 +31,7 @@
 
 \title{Pixel vs Symbolic Observations for PPO}
 \subtitle{Super Mario Bros Reinforcement Learning}
-\author{Lucas Martim \and Sergio Contente \and Leonardo Falabella \and Gabriel Corsi \and Lara Polachini}
+\author{Lucas Martim \and Sergio Contente \and Leonardo Falabella \and \\ Gabriel Corsi \and Lara Polachini}
 \institute{CSC-52081 --- Reinforcement Learning}
 \date{\today}
 
@@ -306,25 +306,18 @@ stable flag rate from any start position.
 
 %------------------------------------------------
 \begin{frame}{Results: Multi-Task (Worlds 1-1 to 1-4)}
-\begin{columns}[T]
-\column{0.50\textwidth}
+
 \textbf{Setup:} Worlds 1-1 through 1-4, shared PPO policy.
 
-\vspace{8pt}
 \begin{alertblock}{Problem: reward imbalance}
-1-1 yields rewards earliest $\Rightarrow$\\
-its gradients dominate $\Rightarrow$\\
-later worlds stagnate.
+1-1 yields rewards earliest $\Rightarrow$ its gradients dominate $\Rightarrow$ later worlds stagnate.\\
+{\small\textit{Fix:} per-task reward normalisation or gradient surgery \cite{Yu2020}.}
 \end{alertblock}
 
-\vspace{6pt}
-{\small\textit{Fix:} per-task reward normalisation or gradient surgery \cite{Yu2020}.}
-
-\column{0.46\textwidth}
+\vspace{4pt}
 \begin{center}
-  \imgplaceholder{5.2}{4.2}{Multi-task curves\\(W1-1 through W1-4 flag rates)}
+    \includegraphics[width=0.95\linewidth]{images/symbolic/notebook5 trainning/image.png}
 \end{center}
-\end{columns}
 \end{frame}
 
 %================================================
