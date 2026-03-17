@@ -66,7 +66,7 @@ We compare two observation pipelines under the **same PPO algorithm and reward s
 
 ```bash
 # Using conda
-conda create -n mario python=3.10
+conda create -n mario python=3.14
 conda activate mario
 
 # Or with a virtualenv
@@ -264,33 +264,3 @@ Both pipelines use the same shaping so results are directly comparable:
 - **`CheckpointAndLogCallback`**: Saves model checkpoints every N steps; logs per-episode reward, length, and flag rate to TensorBoard — without needing a `Monitor` wrapper.
 - **`CurriculumCallback`**: Gradually increases `random_start_steps` during training so Mario must learn to play from diverse positions.
 - **`PerLevelEvalCallback`**: Periodically evaluates the agent on multiple levels and logs per-level metrics separately.
-
----
-
-## Results
-
-| Model | Level | Flag Rate | Avg Reward | Steps to Converge | Hardware |
-|---|---|---|---|---|---|
-| Symbolic PPO | 1-1 | **100%** | ~315 | ~500k | CPU (8 cores, ~17 min) |
-| Pixel PPO | 1-1 | High | — | >500k | Colab T4 GPU |
-| Symbolic PPO (transfer) | 1-2 | ~100% | — | ~200k extra | CPU |
-| Symbolic PPO (transfer) | 1-1 | **0%** | — | — | Catastrophic forgetting |
-| Multi-task PPO | 1-1 | Converges | — | — | Only 1-1 learned |
-| Multi-task PPO | 1-2 | Fails | — | — | Reward imbalance |
-
-**Key takeaways:**
-- Symbolic PPO converges ~6× faster in wall-clock time than pixel PPO.
-- Transfer learning enables rapid adaptation to new levels but destroys performance on the original.
-- Multi-task training on both levels fails due to the easier level dominating gradients.
-- Curriculum learning (random starts) improves generalization within a level.
-
----
-
-## References
-
-- Schulman et al. (2017) — [Proximal Policy Optimization Algorithms](https://arxiv.org/abs/1707.06347)
-- Mnih et al. (2015) — Human-level control through deep reinforcement learning (Nature CNN)
-- Wang et al. (2016) — Dueling Network Architectures for Deep Reinforcement Learning
-- [vietnh1009](https://github.com/vietnh1009/Super-mario-bros-PPO-pytorch) — Reward shaping & pixel wrappers
-- [yumouwei](https://github.com/yumouwei/super-mario-bros-reinforcement-learning) — RAM grid extraction (`smb_grid`)
-- Raffin et al. — [Stable-Baselines3](https://stable-baselines3.readthedocs.io/)

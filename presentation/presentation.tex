@@ -250,26 +250,25 @@ but requires domain knowledge.
 %------------------------------------------------
 \begin{frame}{Results: Transfer Learning 1-1 $\to$ 1-2}
 \begin{columns}[T]
-\column{0.48\textwidth}
+\column{0.32\textwidth}
 \begin{block}{Setup}
 \small
 Train on 1-1 $\to$ fine-tune on 1-2\\
 (lr $= 10^{-5}$, weights unfrozen)
 \end{block}
-\vspace{4pt}
+\column{0.32\textwidth}
 \begin{exampleblock}{World 1-2: \textbf{78\% flag rate}}
-Converges faster than from scratch.
+\small Converges faster than from scratch.
 \end{exampleblock}
-\vspace{4pt}
+\column{0.32\textwidth}
 \begin{alertblock}{World 1-1: \textbf{0\% flag rate}}
-Complete performance collapse.
+\small Complete performance collapse.
 \end{alertblock}
-
-\column{0.48\textwidth}
-\begin{center}
-  \includegraphics[width=1\linewidth]{images/symbolic/comparison_w1l1_w1l2_ppo/catastophic.png}
-\end{center}
 \end{columns}
+\vspace{4pt}
+\begin{center}
+  \includegraphics[width=0.8\linewidth]{images/symbolic/comparison_w1l1_w1l2_ppo/catastophic.png}
+\end{center}
 \end{frame}
 
 %------------------------------------------------
@@ -358,15 +357,6 @@ later worlds stagnate.
   \item Reward imbalance identified as multi-task bottleneck
 \end{itemize}
 
-\column{0.46\textwidth}
-\begin{block}{Future work}
-\begin{itemize}
-  \item EWC for continual learning
-  \item Per-task reward normalisation
-  \item Curriculum across all 8 worlds
-  \item LSTM policy for memory
-\end{itemize}
-\end{block}
 \end{columns}
 \end{frame}
 
