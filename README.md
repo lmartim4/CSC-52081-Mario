@@ -1,62 +1,89 @@
-# CSC-52081 — Super Mario Bros RL
+# CSC-52081 — Super Mario Bros Reinforcement Learning
 
 Comparing **PPO with pixel observations (CnnPolicy)** vs **PPO with symbolic/RAM observations (MlpPolicy)** on Super Mario Bros, including transfer learning between levels and analysis of catastrophic forgetting.
 
+> **Authors:** Lucas Martim, Sergio Contente, Leonardo Falabella, Gabriel Corsi, Lara Polachini
+> **Course:** CSC-52081 — Reinforcement Learning
+
+---
+
+## Table of Contents
+
+1. [Project Overview](#project-overview)
+2. [Setup](#setup)
+3. [How to Run](#how-to-run)
+4. [Training](#training)
+5. [Project Structure](#project-structure)
+6. [How It Works](#how-it-works)
+7. [Results](#results)
+8. [References](#references)
+
+---
+
 ## Project Overview
 
-### Motivation
+### Research Question
 
-Traditional approaches to Super Mario Bros use **Dueling DQN** with Double DQN and Prioritized Experience Replay. We trained a vanilla DQN as a baseline but it failed to converge in 200k steps — confirming that DQN requires significant extensions for this domain.
-
-We chose **PPO** (Proximal Policy Optimization) as an alternative: it is simpler, on-policy, avoids Q-value overestimation, and is more stable to train. Our main research question: **can PPO with a compact symbolic representation (RAM) compete with pixel-based approaches?**
+Can PPO with a **compact symbolic (RAM-based) observation** compete with or outperform **pixel-based CNN approaches** on Super Mario Bros — while being dramatically faster to train?
 
 ### Approach
 
-We compare two observation representations under the same PPO algorithm and reward shaping:
+We compare two observation pipelines under the **same PPO algorithm and reward shaping**:
 
-| | Pixel (CnnPolicy) | Symbolic/RAM (MlpPolicy) |
+| | Pixel (CnnPolicy) | Symbolic / RAM (MlpPolicy) |
 |---|---|---|
-| **Observation** | Grayscale 84x84, 4 frame stack | 13x16 grid from NES RAM, 4 frame stack, flattened (832-dim) |
+| **Observation** | 84×84 grayscale, 4-frame stack | 13×16 tile grid from NES RAM, 4-frame stack → flattened (833-dim) |
 | **Network** | Nature CNN (Mnih et al. 2015) | MLP [512, 512] |
 | **Speed** | ~78 fps (Colab T4 GPU) | ~500 fps (CPU, 8 cores) |
-| **Preprocessing** | Max-pooling (anti-flickering), grayscale, resize | RAM grid extraction via `smb_grid` |
+| **Preprocessing** | Max-pooling, grayscale, resize | RAM extraction via `smb_grid` |
 
-**Reward shaping** (identical for both, from vietnh1009):
-- Score bonus: `+score_delta / 40`
-- Flag reached: `+50`
-- Death / timeout: `-50`
-- All rewards normalized by `/10`
+**Reward shaping** (identical for both, adapted from vietnh1009):
 
-**Hyperparameters**: gamma=0.9, lr=2.5e-4 (Phase 1) → 1e-5 (Phase 2), 8 parallel envs (SubprocVecEnv), batch_size=256, n_steps=512, n_epochs=4.
-
-### Key Results
-
-- **Symbolic PPO 1-1**: 100% flag rate, reward ~315, converged in ~500k steps (~17 min)
-- **Pixel PPO 1-1**: Trained on Colab T4 GPU (significantly slower)
-- **Transfer learning 1-1 → 1-2**: Successfully learned 1-2 (100% flag rate), but suffered **catastrophic forgetting** (0% on 1-1)
-- **Multi-task training** (1-1 + 1-2 simultaneously): The agent converged only on 1-1 due to reward imbalance — the easier level dominates the gradient
-- **Symbolic is much more sample-efficient** than pixel — faster training, faster convergence, comparable final performance
+| Event | Reward |
+|---|---|
+| Score increase | `+score_delta / 40` |
+| Flag reached | `+50` |
+| Death or timeout | `−50` |
+| Normalization | All values divided by 10 |
 
 ### Experiments
 
-1. **DQN baseline** — vanilla DQN fails on Mario (motivates PPO)
-2. **Pixel PPO** — CnnPolicy with vietnh1009's optimized wrappers
-3. **Symbolic PPO** — MlpPolicy with RAM-based grid observation (our main contribution)
-4. **Transfer learning** — fine-tune 1-1 model on 1-2
-5. **Catastrophic forgetting analysis** — 1-2 model fails on 1-1
-6. **Multi-task attempt** — training on both levels simultaneously (negative result, discussed)
+| # | Experiment | Outcome |
+|---|---|---|
+| 1 | DQN baseline on 1-1 | Fails to converge in 200k steps → motivates PPO |
+| 2 | Pixel PPO on 1-1 | Converges (on Colab GPU) |
+| 3 | Symbolic PPO on 1-1 | **100% flag rate, ~500k steps on CPU** |
+| 4 | Transfer learning: 1-1 → 1-2 | Learns 1-2 successfully |
+| 5 | Catastrophic forgetting check | 1-2 fine-tuned model scores 0% on 1-1 |
+| 6 | Multi-task (1-1 + 1-2) | Negative result: only 1-1 converges due to reward imbalance |
+| 7 | Curriculum via random starts | Improves level generalization |
+
+---
 
 ## Setup
 
+### 1. Create and activate environment
+
 ```bash
-conda activate mario_lucas  # or your environment
+# Using conda
+conda create -n mario python=3.10
+conda activate mario
+
+# Or with a virtualenv
+python -m venv .venv && source .venv/bin/activate
+```
+
+### 2. Install dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-### Apply compatibility patches
+### 3. Apply NumPy 2.0 compatibility patches
 
-The dependencies `gym`, `nes-py`, and `gym-super-mario-bros` require patching for NumPy 2.0:
+The `gym`, `nes-py`, and `gym-super-mario-bros` packages need patching for NumPy ≥ 2.0:
 
+**bash / zsh:**
 ```bash
 SITE=$(python -c "import site; print(site.getsitepackages()[0])")
 patch -p0 $SITE/nes_py/_rom.py                   < patches/nes_py_numpy2.patch
@@ -65,6 +92,7 @@ patch -p0 $SITE/gym_super_mario_bros/smb_env.py  < patches/smb_env_numpy2.patch
 patch -p1 $SITE/gym/wrappers/time_limit.py       < patches/gym_time_limit_compat.patch
 ```
 
+**fish:**
 ```fish
 set SITE (python -c "import site; print(site.getsitepackages()[0])")
 patch -p0 $SITE/nes_py/_rom.py                   < patches/nes_py_numpy2.patch
@@ -73,68 +101,196 @@ patch -p0 $SITE/gym_super_mario_bros/smb_env.py  < patches/smb_env_numpy2.patch
 patch -p1 $SITE/gym/wrappers/time_limit.py       < patches/gym_time_limit_compat.patch
 ```
 
+---
 
-## Usage
+## How to Run
 
-### Training notebooks
+### Play manually
 
-| Notebook | Description |
+Control Mario yourself with a keyboard UI:
+
+```bash
+python play_mario.py
+```
+
+Controls:
+
+| Key | Action |
 |---|---|
-| `notebooks/07_custom_ddqn_train.ipynb` | PPO with pixel observations (Colab GPU) |
-| `notebooks/08_symbolic_dqn_train.ipynb` | PPO with symbolic (RAM) observations (local CPU) |
-| `notebooks/09_evaluate_checkpoints.ipynb` | Checkpoint evaluation & learning curves |
-| `notebooks/10_multitask_train.ipynb` | Multi-task training on 1-1 + 1-2 |
+| → | Move right |
+| ← | Move left |
+| Z | Jump (A button) |
+| X | Run / Fire (B button) |
+| Combinations | Right+Z = run-jump, etc. |
+
+The HUD shows real-time steps, reward, X position, and current action. Edit `ENV_ID` at the top of [play_mario.py](play_mario.py) to play a different level (e.g. `SuperMarioBros-1-2-v3`).
+
+---
 
 ### Watch a trained agent play
 
 ```bash
-# Symbolic agent on World 1-1
-python watch_agent.py --model ../models/symbolic_ppo/final_model --env SuperMarioBros-1-1-v3
+# Symbolic PPO agent on World 1-1
+python watch_agent.py --model models/symbolic_ppo/final_model --env SuperMarioBros-1-1-v3
 
-# Symbolic agent on World 1-2 (transfer learned)
-python watch_agent.py --model ../models/symbolic_ppo_1_2/final_model --env SuperMarioBros-1-2-v3
+# Symbolic PPO agent on World 1-2 (transfer learned)
+python watch_agent.py --model models/symbolic_ppo_1_2/final_model --env SuperMarioBros-1-2-v3
 
-# Pixel agent on World 1-1
-python watch_agent.py --model ../models/pixel_ppo_v2/final_model --env SuperMarioBros-1-1-v3 --pixel
+# Pixel PPO agent (CNN) — add --pixel flag
+python watch_agent.py --model models/pixel_ppo/final_model --env SuperMarioBros-1-1-v3 --pixel
+
+# Run for N episodes
+python watch_agent.py --model models/symbolic_ppo/final_model --env SuperMarioBros-1-1-v3 --episodes 10
 ```
 
-### TensorBoard
+The window renders the game at 3× scale. Per-episode stats and final flag rate are printed at the end.
+
+---
+
+### Debug the RAM grid
+
+Visualize what the symbolic agent "sees" alongside the actual game:
 
 ```bash
-tensorboard --logdir ../logs/symbolic_ppo   # symbolic training
-tensorboard --logdir ../logs/pixel_ppo      # pixel training
-tensorboard --logdir ../logs               # all runs
+python debug_ram.py SuperMarioBros-1-1-v3
 ```
+
+Split-screen view: game pixels (left) + colored 13×16 grid (right).
+
+| Key | Action |
+|---|---|
+| V | Toggle numeric overlay on grid |
+| P | Pause / unpause |
+| R | Reset episode |
+| Q / Esc | Quit |
+
+Grid cell encoding: `0` empty, `1` solid tile, `-1` enemy, `2` Mario, `3` powerup, `4` fire-bar bead.
+
+---
+
+### Monitor training with TensorBoard
+
+```bash
+tensorboard --logdir logs/symbolic_ppo   # one run
+tensorboard --logdir logs                # all runs
+```
+
+---
+
+## Training
+
+Training is done through numbered Jupyter notebooks in [notebooks/](notebooks/). Run them in order or pick the experiment you want.
+
+| Notebook | Experiment | Notes |
+|---|---|---|
+| [1_symbolic_dqn_w1l1_train.ipynb](notebooks/1_symbolic_dqn_w1l1_train.ipynb) | DQN baseline on 1-1 | Motivates switching to PPO |
+| [2_pixel_ppo_w1l1_train.ipynb](notebooks/2_pixel_ppo_w1l1_train.ipynb) | Pixel PPO (CnnPolicy) on 1-1 | Best run on Colab T4 GPU |
+| [3_symbolic_ppo_w1l1_train.ipynb](notebooks/3_symbolic_ppo_w1l1_train.ipynb) | **Symbolic PPO (MlpPolicy) on 1-1** | Main experiment; runs on CPU |
+| [4_symbolic_ppo_transfer_w1l2_train.ipynb](notebooks/4_symbolic_ppo_transfer_w1l2_train.ipynb) | Transfer learning: fine-tune on 1-2 | Loads 1-1 model, continues on 1-2 |
+| [5_symbolic_ppo_multitask_w1_train.ipynb](notebooks/5_symbolic_ppo_multitask_w1_train.ipynb) | Multi-task: 1-1 + 1-2 jointly | Negative result (see Results) |
+| [6_symbolic_ppo_world1_random_train.ipynb](notebooks/6_symbolic_ppo_world1_random_train.ipynb) | Curriculum via random starts | `RandomStartWrapper` for generalization |
+
+Checkpoints are saved every 50,000 steps under `logs/<run_name>/` and final models under `models/`.
+
+---
 
 ## Project Structure
 
 ```
-src/
-├── wrappers/
-│   ├── pixel_wrappers.py    # CustomReward, CustomSkipFrame, make_pixel_vec_env
-│   └── ram_wrappers.py      # CustomRewardRAM, RAMGridObservation, make_symbolic_vec_env
-├── utils/
-│   ├── callbacks.py         # CheckpointAndLogCallback (tracks episodes without Monitor)
-│   ├── evaluation.py        # evaluate_agent, run_episode
-│   └── smb_utils.py         # RAM grid extraction (from yumouwei)
-├── agents/                  # Agent implementations
-└── config.py                # PPOConfig, ENV_ID, etc.
-
-external/
-└── yumouwei-smb/            # RAM-based grid submodule
-
-notebooks/                   # Training & evaluation notebooks
-models/                      # Saved checkpoints & final models
-logs/                        # TensorBoard logs
-patches/                     # NumPy 2.0 compatibility patches
-watch_agent.py               # Visual evaluation with pyglet
+CSC-52081-Mario/
+├── play_mario.py                   # Manual keyboard play with HUD
+├── watch_agent.py                  # Visual evaluation of trained agents
+├── debug_ram.py                    # Split-screen RAM grid debugger
+│
+├── src/
+│   ├── config.py                   # Centralized hyperparameters (PPOConfig, DQNConfig, EvalConfig)
+│   ├── wrappers/
+│   │   ├── pixel_wrappers.py       # Pixel pipeline: CustomReward, CustomSkipFrame, make_pixel_vec_env
+│   │   └── ram_wrappers.py         # Symbolic pipeline: RAMGridObservation, FrameStackGrid, FlattenGrid,
+│   │                               #   RandomStartWrapper, make_symbolic_vec_env, make_symbolic_multitask_vec_env
+│   └── utils/
+│       ├── callbacks.py            # CheckpointAndLogCallback, CurriculumCallback, PerLevelEvalCallback
+│       └── smb_utils.py            # smb_grid: NES RAM → 13×16 tile grid (from yumouwei)
+│
+├── notebooks/                      # Training notebooks (numbered by experiment)
+├── models/                         # Saved model checkpoints and final models
+├── logs/                           # TensorBoard training logs
+├── patches/                        # NumPy 2.0 compatibility patches
+├── presentation/                   # Beamer LaTeX slides
+└── requirements.txt
 ```
+
+---
+
+## How It Works
+
+### Symbolic (RAM) observation pipeline
+
+Instead of processing pixels, we read NES RAM directly to build a compact 13×16 tile grid:
+
+1. **`smb_grid`** (in `src/utils/smb_utils.py`) reads RAM addresses to extract:
+   - Tile layout (solid blocks, pipes, etc.)
+   - Mario's position (screen X/Y, level X)
+   - Enemy positions and types
+   - Fire-bar bead positions (angle-based rotation math)
+   - Powerup positions
+
+2. **`RAMGridObservation`** wraps the environment so `step()` returns this grid instead of pixels.
+
+3. **`FrameStackGrid`** stacks the last 4 frames along the third axis → shape `(13, 16, 4)`.
+
+4. **`FlattenGrid`** flattens to a 833-dim vector (832 grid values + 1 power-up state flag).
+
+5. **`PPO` with `MlpPolicy`** trains a 2-layer MLP `[512, 512]` on these flattened observations.
+
+### Pixel observation pipeline
+
+1. `CustomSkipFrame` skips 4 frames with max-pooling (anti-flickering), converts to 84×84 grayscale, and stacks 4 frames → shape `(4, 84, 84)`.
+2. **`PPO` with `CnnPolicy`** uses the Nature CNN architecture (3 conv layers → FC 512).
+
+### Parallel training
+
+Both pipelines use `SubprocVecEnv` with 8 parallel environments for faster rollout collection.
+
+### Reward shaping
+
+Both pipelines use the same shaping so results are directly comparable:
+- Positive score deltas → small positive reward
+- Reaching the flag → large positive reward
+- Dying or timing out → large negative reward
+
+### Callbacks
+
+- **`CheckpointAndLogCallback`**: Saves model checkpoints every N steps; logs per-episode reward, length, and flag rate to TensorBoard — without needing a `Monitor` wrapper.
+- **`CurriculumCallback`**: Gradually increases `random_start_steps` during training so Mario must learn to play from diverse positions.
+- **`PerLevelEvalCallback`**: Periodically evaluates the agent on multiple levels and logs per-level metrics separately.
+
+---
+
+## Results
+
+| Model | Level | Flag Rate | Avg Reward | Steps to Converge | Hardware |
+|---|---|---|---|---|---|
+| Symbolic PPO | 1-1 | **100%** | ~315 | ~500k | CPU (8 cores, ~17 min) |
+| Pixel PPO | 1-1 | High | — | >500k | Colab T4 GPU |
+| Symbolic PPO (transfer) | 1-2 | ~100% | — | ~200k extra | CPU |
+| Symbolic PPO (transfer) | 1-1 | **0%** | — | — | Catastrophic forgetting |
+| Multi-task PPO | 1-1 | Converges | — | — | Only 1-1 learned |
+| Multi-task PPO | 1-2 | Fails | — | — | Reward imbalance |
+
+**Key takeaways:**
+- Symbolic PPO converges ~6× faster in wall-clock time than pixel PPO.
+- Transfer learning enables rapid adaptation to new levels but destroys performance on the original.
+- Multi-task training on both levels fails due to the easier level dominating gradients.
+- Curriculum learning (random starts) improves generalization within a level.
+
+---
 
 ## References
 
-- Schulman et al. (2017) — Proximal Policy Optimization Algorithms
+- Schulman et al. (2017) — [Proximal Policy Optimization Algorithms](https://arxiv.org/abs/1707.06347)
 - Mnih et al. (2015) — Human-level control through deep reinforcement learning (Nature CNN)
 - Wang et al. (2016) — Dueling Network Architectures for Deep Reinforcement Learning
-- vietnh1009 — Super-mario-bros-PPO-pytorch (reward shaping & pixel wrappers)
-- yumouwei — super-mario-bros-reinforcement-learning (RAM grid extraction)
-- Raffin et al. — Stable-Baselines3
+- [vietnh1009](https://github.com/vietnh1009/Super-mario-bros-PPO-pytorch) — Reward shaping & pixel wrappers
+- [yumouwei](https://github.com/yumouwei/super-mario-bros-reinforcement-learning) — RAM grid extraction (`smb_grid`)
+- Raffin et al. — [Stable-Baselines3](https://stable-baselines3.readthedocs.io/)
