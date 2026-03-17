@@ -323,35 +323,8 @@ throughput and faster wall-clock convergence to a higher reward.
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}
-\begin{axis}[
-  width=\linewidth, height=3.8cm,
-  xlabel={\small Steps ($\times 10^3$)},
-  ylabel={\small Mean Reward},
-  xmin=0, xmax=1000, ymin=-80, ymax=340,
-  xtick={0,200,400,600,800,1000},
-  tick label style={font=\tiny},
-  label style={font=\small},
-  legend style={font=\tiny, at={(0.98,0.05)}, anchor=south east},
-  grid=major, grid style={line width=0.3pt, gray!30},
-  thick
-]
-\addplot[color=accentgreen, thick, smooth] coordinates {
-  (0,-60)(50,-30)(100,20)(150,80)(200,160)(300,240)(400,285)(500,300)(600,304)(700,304)(800,304)(1000,304)
-};
-\addlegendentry{Symbolic PPO}
-\addplot[color=mainblue, thick, smooth, dashed] coordinates {
-  (0,-60)(100,-40)(200,-10)(300,30)(400,80)(500,130)(600,180)(700,220)(800,250)(900,270)(1000,285)
-};
-\addlegendentry{Pixel PPO}
-\addplot[color=accentred, thick, dotted] coordinates {
-  (0,-50)(50,-45)(100,-42)(150,-40)(200,-38)(300,-35)
-};
-\addlegendentry{Symbolic DQN}
-\end{axis}
-\end{tikzpicture}
-\caption{Schematic learning curves for World~1-1. Symbolic PPO converges
-faster and to a higher mean reward. DQN fails to make progress.}
+\includegraphics[width=\linewidth]{images/ppo_pixel_symbol_dqn_w1l1.png}
+\caption{Symbolic PPO vs Symbolic DQN}
 \label{fig:learning_curves}
 \end{figure}
 
@@ -371,10 +344,8 @@ specialized for~1-1.
 
 \begin{figure}[H]
 \centering
-\imgplaceholder{7.5}{3.2}{Flag rate over fine-tuning steps:\\
-World 1-2 (rising) vs.\ World 1-1 (collapsing to 0\%)}
-\caption{Catastrophic forgetting during 1-1\,$\to$\,1-2 transfer. Replace
-with TensorBoard flag-rate curves for both levels.}
+\includegraphics[width=\linewidth]{images/catastophic.png}
+\caption{Catastrophic forgetting during 1-1\,$\to$\,1-2 transfer.}
 \label{fig:forgetting}
 \end{figure}
 
@@ -406,14 +377,6 @@ across diverse level sections rather than memorizing a fixed trajectory,
 evidenced by stable flag rates even when the start position is randomized
 at evaluation time.
 
-\begin{figure}[H]
-\centering
-\imgplaceholder{7.5}{2.8}{Flag rate / mean X-position vs.\ steps:\\
-fixed start (dashed) vs.\ random start (solid)}
-\caption{Curriculum training improves level-wide generalization. Replace
-with TensorBoard flag-rate and mean X-pos curves.}
-\label{fig:curriculum}
-\end{figure}
 
 \subsection{Multi-Task Training: Worlds 1-1 to 1-4}
 
@@ -428,10 +391,9 @@ balance training.
 
 \begin{figure}[H]
 \centering
-\imgplaceholder{7.5}{2.8}{Per-level flag rate vs.\ steps:\\
-W1-1, W1-2, W1-3, W1-4 (joint training)}
+\includegraphics[width=\linewidth]{images/notebook5_training.png}
 \caption{Multi-task training: World~1-1 converges while later levels
-stagnate. Replace with per-level TensorBoard eval curves.}
+stagnate.}
 \label{fig:multitask}
 \end{figure}
 
@@ -919,8 +881,7 @@ specialized for~1-1.
 \centering
 \imgplaceholder{7.5}{3.2}{Flag rate over fine-tuning steps:\\
 World 1-2 (rising) vs.\ World 1-1 (collapsing to 0\%)}
-\caption{Catastrophic forgetting during 1-1\,$\to$\,1-2 transfer. Replace
-with TensorBoard flag-rate curves for both levels.}
+\caption{Catastrophic forgetting during 1-1\,$\to$\,1-2 transfer.}
 \label{fig:forgetting}
 \end{figure}
 
@@ -956,8 +917,7 @@ at evaluation time.
 \centering
 \imgplaceholder{7.5}{2.8}{Flag rate / mean X-position vs.\ steps:\\
 fixed start (dashed) vs.\ random start (solid)}
-\caption{Curriculum training improves level-wide generalization. Replace
-with TensorBoard flag-rate and mean X-pos curves.}
+\caption{Curriculum training improves level-wide generalization.}
 \label{fig:curriculum}
 \end{figure}
 
@@ -977,7 +937,7 @@ balance training.
 \imgplaceholder{7.5}{2.8}{Per-level flag rate vs.\ steps:\\
 W1-1, W1-2, W1-3, W1-4 (joint training)}
 \caption{Multi-task training: World~1-1 converges while later levels
-stagnate. Replace with per-level TensorBoard eval curves.}
+stagnate.}
 \label{fig:multitask}
 \end{figure}
 
@@ -1465,8 +1425,7 @@ specialized for~1-1.
 \centering
 \imgplaceholder{7.5}{3.2}{Flag rate over fine-tuning steps:\\
 World 1-2 (rising) vs.\ World 1-1 (collapsing to 0\%)}
-\caption{Catastrophic forgetting during 1-1\,$\to$\,1-2 transfer. Replace
-with TensorBoard flag-rate curves for both levels.}
+\caption{Catastrophic forgetting during 1-1\,$\to$\,1-2 transfer.}
 \label{fig:forgetting}
 \end{figure}
 
@@ -1502,8 +1461,7 @@ at evaluation time.
 \centering
 \imgplaceholder{7.5}{2.8}{Flag rate / mean X-position vs.\ steps:\\
 fixed start (dashed) vs.\ random start (solid)}
-\caption{Curriculum training improves level-wide generalization. Replace
-with TensorBoard flag-rate and mean X-pos curves.}
+\caption{Curriculum training improves level-wide generalization.}
 \label{fig:curriculum}
 \end{figure}
 
@@ -1523,7 +1481,7 @@ balance training.
 \imgplaceholder{7.5}{2.8}{Per-level flag rate vs.\ steps:\\
 W1-1, W1-2, W1-3, W1-4 (joint training)}
 \caption{Multi-task training: World~1-1 converges while later levels
-stagnate. Replace with per-level TensorBoard eval curves.}
+stagnate.}
 \label{fig:multitask}
 \end{figure}
 
