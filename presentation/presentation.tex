@@ -224,27 +224,24 @@ but requires domain knowledge.
 %================================================
 
 \begin{frame}{Results: World 1-1 Summary}
-\begin{columns}[T]
-\column{0.55\textwidth}
 \begin{alertblock}{Symbolic DQN --- 0\% flag}
   Never escapes the first obstacle.
 \end{alertblock}
-\vspace{4pt}
+\vspace{6pt}
 \begin{block}{Pixel PPO --- $>$80\% flag}
-  Mean reward $\approx 285$.\\
-  Slow: 78 FPS on GPU.
+  Mean reward $\approx 285$.\quad Slow: 78 FPS on GPU.
 \end{block}
-\vspace{4pt}
+\vspace{6pt}
 \begin{exampleblock}{Symbolic PPO --- 93\% flag (peak 97\%)}
-  Mean reward $\approx 304$.\\
-  Fast: 500 FPS on CPU.
+  Mean reward $\approx 304$.\quad Fast: 500 FPS on CPU.
 \end{exampleblock}
+\end{frame}
 
-\column{0.42\textwidth}
+%------------------------------------------------
+\begin{frame}{Results: World 1-1 Summary (Training Curves)}
 \begin{center}
-  \includegraphics[width=\textwidth, keepaspectratio]{../results/comparison.png}
+  \includegraphics[width=0.85\linewidth]{images/ppo_pixel_symbol_dqn_w1l1.png}
 \end{center}
-\end{columns}
 \end{frame}
 
 %------------------------------------------------
@@ -272,23 +269,38 @@ Train on 1-1 $\to$ fine-tune on 1-2\\
 \end{frame}
 
 %------------------------------------------------
-\begin{frame}{Results: Random Start (World 1-1)}
+\begin{frame}{Results: Random-Start Curriculum (World 1-1)}
 \begin{columns}[T]
-\column{0.50\textwidth}
-\textbf{Motivation:} fixed start $\to$ trajectory overfitting.
+\column{0.52\textwidth}
+\textbf{Problem:} fixed start $\Rightarrow$ agent memorises one trajectory.
 
-\vspace{8pt}
-\textbf{Setup:} start position sampled uniformly along the level.
+\vspace{6pt}
+\textbf{Two-layer solution:}
+\begin{enumerate}
+  \item \textbf{Random-start wrapper} --- at each reset, execute
+        $n \sim \mathcal{U}[0, N_{\max}]$ forward actions\\
+        {\small(right / right+A / right+B / right+A+B)}\\
+        Mario \emph{walks} into the level, not teleported.
+  \item \textbf{Curriculum callback} --- linearly anneal
+        $N_{\max}: 0 \to 100$ over training (every 1\,k steps). Easy start first, then harder as the agent improves.
+\end{enumerate}
 
-\vspace{8pt}
+\vspace{6pt}
 \begin{exampleblock}{Result}
-Agent generalises across level sections; less positional overfitting.
+Agent generalises across all level sections;\\
+stable flag rate from any start position.
 \end{exampleblock}
 
-\column{0.46\textwidth}
-\begin{center}
-  \imgplaceholder{5.2}{4.2}{Random start training curve}
-\end{center}
+\column{0.44\textwidth}
+\begin{block}{Design separation}
+\small
+\begin{tabular}{p{1.6cm}p{2.5cm}}
+  \toprule
+  \textbf{Random start} & \emph{how} Mario is placed \\
+  \textbf{Curriculum}   & \emph{when/how far} to place him \\
+  \bottomrule
+\end{tabular}
+\end{block}
 \end{columns}
 \end{frame}
 
